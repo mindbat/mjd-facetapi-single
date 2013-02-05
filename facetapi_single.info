@@ -1,0 +1,9 @@
+name = Facet API Single
+core = 7.x
+description = "Enables single facets for searches with Facet API."
+dependencies[] = facetapi
+package = MJD
+files[] = facetapi_single.module
+files[] = plugins/facetapi/url_processor_single.inc
+
+

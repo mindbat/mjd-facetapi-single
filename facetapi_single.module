@@ -1,0 +1,113 @@
+<?php
+
+/**
+ * @file
+ * The FacetAPI Single module.
+ */
+
+/**
+ * Implements hook_facetapi_url_processors().
+ */
+function facetapi_single_facetapi_url_processors() {
+  return array(
+    'single' => array(
+      'handler' => array(
+        'label' => t('Single'),
+        'class' => 'FacetapiUrlProcessorSingle',
+      ),
+    ),
+  );
+}
+
+/**
+ * Allows for alterations to the searcher definitions.
+ *
+ * @param array &$searcher_info
+ *   The return values of hook_facetapi_searcher_info() implementations.
+ *
+ * Implements hook_facetapi_searcher_info().
+ */
+function facetapi_single_facetapi_searcher_info_alter(array &$searcher_info) {
+  foreach ($searcher_info as &$info) {
+    // Activate single facets optionally per searcher, as configured.
+    $id = 'facetapi_single_searcher_' . $info['name'];
+    $info['url processor'] = variable_get($id) ? 'single' : 'standard';
+  }
+}
+
+/**
+ * Add single facet settings to facet configuration.
+ *
+ * Implements hook_form_BASE_FORM_ID_alter().
+ */
+function facetapi_single_form_facetapi_facet_display_form_alter(&$form, &$form_state, $form_id) {
+  if (!user_access('administer facetapi single facets')) {
+    return;
+  }
+  // Get global facet settings.
+  $adapter = $form['#facetapi']['adapter'];
+  $processor = new FacetapiUrlProcessorSingle($adapter);
+  $isSingle = $processor->isSingleFacet($form['#facetapi']['facet']);
+
+  // Add single facets option to global facet settings.
+  $form['global']['single_facet'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Allow only single facet selection'),
+    '#default_value' => $isSingle,
+    '#prefix' => '<div class="facetapi-global-setting">',
+    '#description' => t('Checking this box will override the normal facet settings. Users will only be able to choose one term at a time for this facet.'),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function facetapi_single_menu() {
+  $items = array();
+  $items['admin/config/search/facetapi_single'] = array(
+    'title' => 'FacetAPI Single Facets',
+    'description' => 'Configure single facets settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('facetapi_single_admin_form'),
+    'access arguments' => array('administer facetapi single facets'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function facetapi_single_permission() {
+  return array(
+    'administer facetapi single facets' => array(
+      'title' => t('Administer Facet API Single Facets'),
+    ),
+  );
+}
+
+/**
+ * Administration form.
+ */
+function facetapi_single_admin_form() {
+  $form = array();
+  // Allow to enable / disable single facets per searcher.
+  $searcher_info = facetapi_get_searcher_info();
+  $form['searcher'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Enable single facets per searcher'),
+    '#type' => 'fieldset',
+  );
+  foreach ($searcher_info as &$info) {
+    $id = 'facetapi_single_searcher_' . $info['name'];
+    // Add a checkbox to enable pretty paths per searcher.
+    $form['searcher'][$id] = array(
+      '#type' => 'checkbox',
+      '#title' => $info['name'],
+      '#default_value' => variable_get($id, $info['url processor'] == 'single'),
+      '#description' => t("Enable single facets for the @searcher_label", array("@searcher_label" => $info['label'])),
+    );
+  }
+  return system_settings_form($form);
+}
+
